@@ -3,6 +3,8 @@ from config import controller2, username, password
 import os
 import pandas as pd
 from datetime import datetime
+import time
+import numpy as np
 
 crc_api = "/node/class/rmonEtherStats.json?&order-by=rmonEtherStats.modTs|desc"
 fcs_api = "/node/class/rmonDot3Stats.json?&order-by=rmonDot3Stats.modTs|desc"
@@ -71,13 +73,15 @@ class Parsers():
         for i in self.native:
             dn = i["rmonEtherStats"]["attributes"]["dn"]
             node = dn.split("/")[2]
-            interface = dn.split("/")[5][:-1]
             crc = i["rmonEtherStats"]["attributes"]["cRCAlignErrors"]
             try:
-                int(interface)
-                d = {j: {"Node": node, "interface": interface, "crc": crc}}
-                crc_dic.update(d)
-                j += 1
+                interface = dn.split("/")[4][6:] + "/" + dn.split("/")[5][:-1]
+                if interface.startswith("eth"):
+                    d = {j: {"Node": node, "interface": interface, "crc": crc}}
+                    crc_dic.update(d)
+                    j += 1
+                else:
+                    pass
             except:
                 pass
             z += 1
@@ -140,11 +144,47 @@ class DataFrame(object):
 if __name__ == '__main__':
     session = RestSession(controller2, username, password)
     if session.login().ok:
-        native = session.get_json(lldp_api)
-        parser = Parsers(native)
-        dict = parser.lldp()[0]
-        max_row = parser.lldp()[1]
-        df = DataFrame(dict, max_row)
-        print(df.df())
+        #Gather Data Frame for LLDP
+        native_lldp = session.get_json(lldp_api)
+        parser_lldp = Parsers(native_lldp)
+        dict_lldp = parser_lldp.lldp()[0]
+        max_row = parser_lldp.lldp()[1]
+        df_lldp = DataFrame(dict_lldp, max_row).df()
+        print(df_lldp)
+        pass
+        ##Gather first crc, fcs
+        #First CRC
+        native_crc_1 = session.get_json(crc_api)
+        parser_crc_1 = Parsers(native_crc_1)
+        dict_crc_1= parser_crc_1.crc()[0]
+        max_row = parser_crc_1.crc()[1]
+        df_crc_1 = DataFrame(dict_crc_1, max_row).df()
+        #First FCS
+        native_fcs_1 = session.get_json(fcs_api)
+        parser_fcs_1 = Parsers(native_fcs_1)
+        dict_fcs_1= parser_fcs_1.fcs()[0]
+        max_row = parser_fcs_1.fcs()[1]
+        df_fcs_1 = DataFrame(dict_fcs_1, max_row).df()
+        df_crc_1["fcs"] = df_fcs_1["fcs"]
+        df_total_1 = df_crc_1
+        ##Sleep for 60 sec
+        time.sleep(60)
+        ##Gather second crc, fcs
+        #Second CRC
+        native_crc_2 = session.get_json(crc_api)
+        parser_crc_2 = Parsers(native_crc_2)
+        dict_crc_2= parser_crc_2.crc()[0]
+        max_row = parser_crc_2.crc()[1]
+        df_crc_2 = DataFrame(dict_crc_2, max_row).df()
+        #Second FCS
+        native_fcs_2 = session.get_json(fcs_api)
+        parser_fcs_2 = Parsers(native_fcs_2)
+        dict_fcs_2= parser_fcs_2.fcs()[0]
+        max_row = parser_fcs_2.fcs()[1]
+        df_fcs_2 = DataFrame(dict_fcs_2, max_row).df()
+
+        df_crc_2["fcs"] = df_fcs_2["fcs"]
+        df_total_2 = df_crc_2
+
     else:
         print(session.login().text)
