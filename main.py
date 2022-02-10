@@ -1,32 +1,15 @@
 import requests
-from config import controller2, username, password
 import os
 import pandas as pd
 from datetime import datetime
 import time
 import numpy as np
+import ipaddress
+import getpass
 
 crc_api = "/node/class/rmonEtherStats.json?&order-by=rmonEtherStats.modTs|desc"
 fcs_api = "/node/class/rmonDot3Stats.json?&order-by=rmonDot3Stats.modTs|desc"
 lldp_api = "/node/class/lldpAdjEp.json?&order-by=lldpAdjEp.dn|asc"
-
-# class staticurls():
-#     @staticmethod
-#     def fcs_url():
-#         fcs_url = base_url + fcs_api
-#         return fcs_url
-#     @staticmethod
-#     def crc_url():
-#         crc_url = base_url + crc_api
-#         return crc_url
-#     @staticmethod
-#     def lldp_url():
-#         lldp_url = base_url + lldp_api
-#         return lldp_url
-
-# print(staticurls.fcs_url())
-# print("\n")
-# print(staticurls.crc_url())
 
 
 class RestSession():
@@ -140,51 +123,95 @@ class DataFrame(object):
         df = pd.DataFrame.from_dict(self.dict, orient="index")
         df.sort_values("Node", ascending=True)
         return df
+    
+    @staticmethod
+    def df_to_excel(df):
+        try:
+            t = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
+            xl = "CRC_FCS_"+t+".xlsx"
+            writer = pd.ExcelWriter(xl, engine="xlsxwriter")
+            df.to_excel(writer)
+            writer.save()
+            print("Please check excel named %s for crc and fcs records!" % (xl))
+        except:
+            print("An exception occurred during the creation of excel for dataframe!!")
+
 
 if __name__ == '__main__':
-    session = RestSession(controller2, username, password)
-    if session.login().ok:
-        #Gather Data Frame for LLDP
-        native_lldp = session.get_json(lldp_api)
-        parser_lldp = Parsers(native_lldp)
-        dict_lldp = parser_lldp.lldp()[0]
-        max_row = parser_lldp.lldp()[1]
-        df_lldp = DataFrame(dict_lldp, max_row).df()
-        print(df_lldp)
-        pass
-        ##Gather first crc, fcs
-        #First CRC
-        native_crc_1 = session.get_json(crc_api)
-        parser_crc_1 = Parsers(native_crc_1)
-        dict_crc_1= parser_crc_1.crc()[0]
-        max_row = parser_crc_1.crc()[1]
-        df_crc_1 = DataFrame(dict_crc_1, max_row).df()
-        #First FCS
-        native_fcs_1 = session.get_json(fcs_api)
-        parser_fcs_1 = Parsers(native_fcs_1)
-        dict_fcs_1= parser_fcs_1.fcs()[0]
-        max_row = parser_fcs_1.fcs()[1]
-        df_fcs_1 = DataFrame(dict_fcs_1, max_row).df()
-        df_crc_1["fcs"] = df_fcs_1["fcs"]
-        df_total_1 = df_crc_1
-        ##Sleep for 60 sec
-        time.sleep(60)
-        ##Gather second crc, fcs
-        #Second CRC
-        native_crc_2 = session.get_json(crc_api)
-        parser_crc_2 = Parsers(native_crc_2)
-        dict_crc_2= parser_crc_2.crc()[0]
-        max_row = parser_crc_2.crc()[1]
-        df_crc_2 = DataFrame(dict_crc_2, max_row).df()
-        #Second FCS
-        native_fcs_2 = session.get_json(fcs_api)
-        parser_fcs_2 = Parsers(native_fcs_2)
-        dict_fcs_2= parser_fcs_2.fcs()[0]
-        max_row = parser_fcs_2.fcs()[1]
-        df_fcs_2 = DataFrame(dict_fcs_2, max_row).df()
-
-        df_crc_2["fcs"] = df_fcs_2["fcs"]
-        df_total_2 = df_crc_2
-
-    else:
-        print(session.login().text)
+    contoller = input("Please enter APIC IP Adress: ")
+    username = input("Please enter username for APIC: ")
+    password = getpass.getpass("Please enter password for APIC: ")
+    interval = int(input("Please give time as integer value of interval for counters as seconds: "))
+    try:
+        ipaddress.ip_address(contoller)
+        session = RestSession(contoller, username, password)
+        if session.login().ok:
+            #Gather Data Frame for LLDP
+            native_lldp = session.get_json(lldp_api)
+            parser_lldp = Parsers(native_lldp)
+            dict_lldp = parser_lldp.lldp()[0]
+            max_row = parser_lldp.lldp()[1]
+            df_lldp = DataFrame(dict_lldp, max_row).df()
+            print("LLDP information is collected. Going for next step!")
+            ##Gather Data Frames for first crc, fcs
+            #First CRC
+            native_crc_1 = session.get_json(crc_api)
+            parser_crc_1 = Parsers(native_crc_1)
+            dict_crc_1= parser_crc_1.crc()[0]
+            max_row = parser_crc_1.crc()[1]
+            df_crc_1 = DataFrame(dict_crc_1, max_row).df()
+            print("First CRC information is collected. Going for next step!")
+            #First FCS
+            native_fcs_1 = session.get_json(fcs_api)
+            parser_fcs_1 = Parsers(native_fcs_1)
+            dict_fcs_1= parser_fcs_1.fcs()[0]
+            max_row = parser_fcs_1.fcs()[1]
+            df_fcs_1 = DataFrame(dict_fcs_1, max_row).df()
+            print("First FCS information is collected. Going for next step!")
+            df_crc_1["fcs"] = df_fcs_1["fcs"]
+            df_total_1 = df_crc_1
+            ##Sleep for given internal (sec)
+            print("Waiting for %s seconds for 2nd round" % (interval))
+            time.sleep(interval)
+            ##Gather Data Frames for second crc, fcs
+            #Second CRC
+            native_crc_2 = session.get_json(crc_api)
+            parser_crc_2 = Parsers(native_crc_2)
+            dict_crc_2= parser_crc_2.crc()[0]
+            max_row = parser_crc_2.crc()[1]
+            df_crc_2 = DataFrame(dict_crc_2, max_row).df()
+            print("Second CRC information is collected. Going for next step!")
+            #Second FCS
+            native_fcs_2 = session.get_json(fcs_api)
+            parser_fcs_2 = Parsers(native_fcs_2)
+            dict_fcs_2= parser_fcs_2.fcs()[0]
+            max_row = parser_fcs_2.fcs()[1]
+            df_fcs_2 = DataFrame(dict_fcs_2, max_row).df()
+            print("Second FCS information is collected. Going for next step!")
+            df_crc_2["fcs"] = df_fcs_2["fcs"]
+            df_total_2 = df_crc_2
+            #Combine dfs: Get Values on df_total_2 to df_tota_1
+            df_total_1["crc_2"] = df_total_2["crc"]
+            df_total_1["fcs_2"] = df_total_2["fcs"]
+            #Convert values of crc and fcs to integer for numeric operaions
+            df_total_1["fcs_2"] = df_total_1["fcs_2"].astype(int)
+            df_total_1["crc_2"] = df_total_1["crc_2"].astype(int)
+            df_total_1["fcs"] = df_total_1["fcs"].astype(int)
+            df_total_1["crc"] = df_total_1["crc"].astype(int)
+            #Use np in order to get diff of crcs and fcss
+            df_total_1["crc_diff"] = np.where(df_total_1["crc"] == df_total_1["crc_2"], 0, df_total_1["crc"] - df_total_1["crc_2"])
+            df_total_1["fcs_diff"] = np.where(df_total_1["fcs"] == df_total_1["fcs_2"], 0, df_total_1["fcs"] - df_total_1["fcs_2"])
+            ###Merge lldp and final crc/fcs dfs
+            df = pd.merge(df_total_1, df_lldp, how="left", on=["Node", "interface"])
+            df.sort_values("crc", ascending=True)
+            df = df.fillna('')
+            print("Data collections is ready!!")
+            #print(df)
+            print("Generating Excel!!")
+            #Create Excel
+            DataFrame.df_to_excel(df)
+        else:
+            print("Unable to login", "\n")
+            print(session.login().text)
+    except ValueError:
+        print('Please check controller address, Given does not appear to be an IPv4')
