@@ -1,4 +1,12 @@
-pandas==1.1.5
-requests==2.24.0
-numpy==1.18.2
+certifi==2021.10.8
+chardet==3.0.4
+idna==2.10
 ipaddress==1.0.23
+numpy==1.18.2
+pandas==1.1.5
+python-dateutil==2.8.2
+pytz==2021.3
+requests==2.24.0
+six==1.16.0
+urllib3==1.25.11
+XlsxWriter==3.0.2
