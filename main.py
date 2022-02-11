@@ -1,3 +1,7 @@
+#Simple Script for CRC/FCS Collection
+#Harun KILINC
+
+
 import requests
 import os
 import pandas as pd
