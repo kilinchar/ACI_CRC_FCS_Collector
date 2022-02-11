@@ -6,6 +6,7 @@ import time
 import numpy as np
 import ipaddress
 import getpass
+import sys
 
 crc_api = "/node/class/rmonEtherStats.json?&order-by=rmonEtherStats.modTs|desc"
 fcs_api = "/node/class/rmonDot3Stats.json?&order-by=rmonDot3Stats.modTs|desc"
@@ -45,6 +46,7 @@ class RestSession():
         return native
 
 
+
 class Parsers():
     def __init__(self,native):
         self.native = native
@@ -82,7 +84,7 @@ class Parsers():
                 neighbour = i["lldpAdjEp"]["attributes"]["sysName"]
                 neighbour_interface = i["lldpAdjEp"]["attributes"]["portIdV"]  ### returns in "eth1/20" format.
                 interface.startswith("eth")
-                d = {j: {"Node": node, "interface": interface, "neighbour": neighbour, "neighbour_interface":neighbour_interface}}
+                d = {j: {"Node": node, "interface": interface, "lldp_neighbour": neighbour, "neighbour_interface":neighbour_interface}}
                 lldp_dic.update(d)
                 j += 1
             except:
@@ -132,7 +134,7 @@ class DataFrame(object):
             writer = pd.ExcelWriter(xl, engine="xlsxwriter")
             df.to_excel(writer)
             writer.save()
-            print("Please check excel named %s for crc and fcs records!" % (xl))
+            print("Please check excel named %s for whole crc and fcs records!" % (xl))
         except:
             print("An exception occurred during the creation of excel for dataframe!!")
 
@@ -141,9 +143,20 @@ if __name__ == '__main__':
     contoller = input("Please enter APIC IP Adress: ")
     username = input("Please enter username for APIC: ")
     password = getpass.getpass("Please enter password for APIC: ")
-    interval = int(input("Please give time as integer value of interval for counters as seconds: "))
     try:
         ipaddress.ip_address(contoller)
+    except ValueError:
+        print('Please check controller address, Given does not appear to be an IPv4')
+        print("Exiting!!")
+        sys.exit(1)
+    try:
+        interval = int(input("Please give time as integer value of interval for counters as seconds: "))
+    except ValueError:
+        print("Interval value is not valid. Please enter interval value as integer!")
+        print("Exiting!!")
+        sys.exit(1)
+
+    try:
         session = RestSession(contoller, username, password)
         if session.login().ok:
             #Gather Data Frame for LLDP
@@ -171,7 +184,7 @@ if __name__ == '__main__':
             df_crc_1["fcs"] = df_fcs_1["fcs"]
             df_total_1 = df_crc_1
             ##Sleep for given internal (sec)
-            print("Waiting for %s seconds for 2nd round" % (interval))
+            print("Waiting for %s seconds for 2nd round!" % (interval))
             time.sleep(interval)
             ##Gather Data Frames for second crc, fcs
             #Second CRC
@@ -206,12 +219,21 @@ if __name__ == '__main__':
             df.sort_values("crc", ascending=True)
             df = df.fillna('')
             print("Data collections is ready!!")
-            #print(df)
             print("Generating Excel!!")
             #Create Excel
             DataFrame.df_to_excel(df)
+            time.sleep(1)
+            print("#################################################################################")
+            print("------------------- Printing Top 10 Based on CRC Values ---------------------")
+            print("#################################################################################")
+            print(df.head(10))  
+
         else:
-            print("Unable to login", "\n")
-            print(session.login().text)
-    except ValueError:
-        print('Please check controller address, Given does not appear to be an IPv4')
+            print("Unable to login due to status code %s and reason is %s " % (session.login().status_code, session.login().reason))
+    except requests.exceptions.ConnectionError:
+        print("Unable to connect to APIC. Please check IP address you entered or please check your connection to APIC!!")
+    except Exception as e:
+        print("Exiting due to below exception. Please check below for details!!")
+        print("#################################################################################")
+        print(e)
+        print("#################################################################################")
