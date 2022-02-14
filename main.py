@@ -221,7 +221,7 @@ if __name__ == '__main__':
             ###Merge lldp and final crc/fcs dfs
             df = pd.merge(df_total_1, df_lldp, how="left", on=["Node", "interface"])
             df = df.fillna('')
-            df.sort_values("crc_2", ascending=False)
+            df = df.sort_values("crc_2", ascending=False)
             print("Data collections is ready!!")
             print("Generating Excel!!")
             #Create Excel
