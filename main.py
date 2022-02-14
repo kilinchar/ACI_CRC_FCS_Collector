@@ -216,12 +216,12 @@ if __name__ == '__main__':
             df_total_1["fcs"] = df_total_1["fcs"].astype(int)
             df_total_1["crc"] = df_total_1["crc"].astype(int)
             #Use np in order to get diff of crcs and fcss
-            df_total_1["crc_diff"] = np.where(df_total_1["crc"] == df_total_1["crc_2"], 0, df_total_1["crc"] - df_total_1["crc_2"])
-            df_total_1["fcs_diff"] = np.where(df_total_1["fcs"] == df_total_1["fcs_2"], 0, df_total_1["fcs"] - df_total_1["fcs_2"])
+            df_total_1["crc_diff"] = np.where(df_total_1["crc"] == df_total_1["crc_2"], 0, df_total_1["crc_2"] - df_total_1["crc"])
+            df_total_1["fcs_diff"] = np.where(df_total_1["fcs"] == df_total_1["fcs_2"], 0, df_total_1["fcs_2"] - df_total_1["fcs"])
             ###Merge lldp and final crc/fcs dfs
             df = pd.merge(df_total_1, df_lldp, how="left", on=["Node", "interface"])
-            df.sort_values("crc", ascending=True)
             df = df.fillna('')
+            df.sort_values("crc_2", ascending=True)
             print("Data collections is ready!!")
             print("Generating Excel!!")
             #Create Excel
