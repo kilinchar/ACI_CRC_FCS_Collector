@@ -136,7 +136,7 @@ class DataFrame(object):
             t = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
             xl = "CRC_FCS_"+t+".xlsx"
             writer = pd.ExcelWriter(xl, engine="xlsxwriter")
-            df.to_excel(writer)
+            df.to_excel(writer, index = False)
             writer.save()
             print("Please check excel named %s for whole crc and fcs records!" % (xl))
         except:
@@ -185,8 +185,8 @@ if __name__ == '__main__':
             max_row = parser_fcs_1.fcs()[1]
             df_fcs_1 = DataFrame(dict_fcs_1, max_row).df()
             print("First FCS information is collected. Going for next step!")
-            df_crc_1["fcs"] = df_fcs_1["fcs"]
-            df_total_1 = df_crc_1
+            #Merge dfs for 1st round
+            df_1 = pd.merge(df_crc_1, df_fcs_1, how="left", on=["Node", "interface"])
             ##Sleep for given internal (sec)
             print("Waiting for %s seconds for 2nd round!" % (interval))
             time.sleep(interval)
@@ -205,32 +205,34 @@ if __name__ == '__main__':
             max_row = parser_fcs_2.fcs()[1]
             df_fcs_2 = DataFrame(dict_fcs_2, max_row).df()
             print("Second FCS information is collected. Going for next step!")
-            df_crc_2["fcs"] = df_fcs_2["fcs"]
-            df_total_2 = df_crc_2
-            #Combine dfs: Get Values on df_total_2 to df_tota_1
-            df_total_1["crc_2"] = df_total_2["crc"]
-            df_total_1["fcs_2"] = df_total_2["fcs"]
+            #Merge dfs for 2nd round
+            df_2 = pd.merge(df_crc_2, df_fcs_2, how="left", on=["Node", "interface"])
+            #Rename columns for further merge
+            df_2.rename(columns={'fcs':'fcs2'}, inplace=True)
+            df_2.rename(columns={'crc':'crc2'}, inplace=True)
+            #Merge all CRC/FCS dfs
+            df_total = pd.merge(df_1, df_2, how="left", on=["Node", "interface"])
             #Convert values of crc and fcs to integer for numeric operaions
-            df_total_1["fcs_2"] = df_total_1["fcs_2"].astype(int)
-            df_total_1["crc_2"] = df_total_1["crc_2"].astype(int)
-            df_total_1["fcs"] = df_total_1["fcs"].astype(int)
-            df_total_1["crc"] = df_total_1["crc"].astype(int)
+            df_total["fcs2"] = df_total["fcs2"].astype(int)
+            df_total["crc2"] = df_total["crc2"].astype(int)
+            df_total["fcs"] = df_total["fcs"].astype(int)
+            df_total["crc"] = df_total["crc"].astype(int)
             #Use np in order to get diff of crcs and fcss
-            df_total_1["crc_diff"] = np.where(df_total_1["crc"] == df_total_1["crc_2"], 0, df_total_1["crc_2"] - df_total_1["crc"])
-            df_total_1["fcs_diff"] = np.where(df_total_1["fcs"] == df_total_1["fcs_2"], 0, df_total_1["fcs_2"] - df_total_1["fcs"])
+            df_total["crc_diff"] = np.where(df_total["crc"] == df_total["crc2"], 0, df_total["crc2"] - df_total["crc"])
+            df_total["fcs_diff"] = np.where(df_total["fcs"] == df_total["fcs2"], 0, df_total["fcs2"] - df_total["fcs"])
             ###Merge lldp and final crc/fcs dfs
-            df = pd.merge(df_total_1, df_lldp, how="left", on=["Node", "interface"])
+            df = pd.merge(df_total , df_lldp, how="left", on=["Node", "interface"])
             df = df.fillna('')
-            df = df.sort_values("crc_2", ascending=False)
+            df = df.sort_values("crc2", ascending=False)
             print("Data collections is ready!!")
             print("Generating Excel!!")
             #Create Excel
             DataFrame.df_to_excel(df)
             time.sleep(1)
             print("#################################################################################")
-            print("------------------- Printing Top 10 Based on CRC Values ---------------------")
+            print("------------------- Printing Top 20 Based on CRC Values ---------------------")
             print("#################################################################################")
-            print(df.head(10))  
+            print(df.head(20))  
 
         else:
             print("Unable to login due to status code %s and reason is %s " % (session.login().status_code, session.login().reason))
